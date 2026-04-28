@@ -432,6 +432,43 @@ export class PmsService {
             return checkOut >= todayStart && checkOut <= todayEnd;
         });
 
+        // Calcular ADR, RevPAR y estadisticas semanales
+        const last7Days: any[] = [];
+        for (let i = 6; i >= 0; i--) {
+            const d = new Date();
+            d.setDate(d.getDate() - i);
+            d.setHours(0, 0, 0, 0);
+            const dEnd = new Date(d);
+            dEnd.setHours(23, 59, 59, 999);
+            last7Days.push({
+                date: d.toISOString().split('T')[0],
+                occupied: 0,
+                revenue: 0
+            });
+        }
+
+        // Obtener reservas de los ultimos 7 dias para estadisticas
+        const recentReservations = await this.reservationRepo.find({
+            where: {
+                companyId,
+                status: ReservationStatus.CHECKED_OUT,
+            },
+            relations: ['room']
+        });
+
+        let totalRevenue = 0;
+        let totalNights = 0;
+
+        for (const res of recentReservations) {
+            if ((res as any).totalPaid) {
+                totalRevenue += Number((res as any).totalPaid);
+            }
+            if (res.checkIn && res.checkOut) {
+                const nights = Math.ceil((new Date(res.checkOut).getTime() - new Date(res.checkIn).getTime()) / (1000 * 60 * 60 * 24));
+                totalNights += nights;
+            }
+        }
+
         // IDs de habitaciones ocupadas por reservas
         const occupiedRoomIds = new Set(
             activeReservations
@@ -439,12 +476,38 @@ export class PmsService {
                 .filter(id => id)
         );
 
+        const adr = occupiedRoomIds.size > 0 ? Math.round(totalRevenue / occupiedRoomIds.size) : 0;
+        const revpar = rooms.length > 0 ? Math.round(totalRevenue / rooms.length) : 0;
+
         // Calcular estado basado en reservas, no solo en room.status
         const occupied = occupiedRoomIds.size;
         const available = rooms.filter(r => !occupiedRoomIds.has(r.id) && r.status === RoomStatus.AVAILABLE).length;
         const maintenance = rooms.filter(r => !occupiedRoomIds.has(r.id) && r.status === RoomStatus.MAINTENANCE).length;
         const cleaning = rooms.filter(r => !occupiedRoomIds.has(r.id) && r.status === RoomStatus.CLEANING).length;
+
+        // Generar alertas
+        const alerts: any[] = [];
         
+        // Alerta de salidas tarde
+        for (const res of activeReservations) {
+            if (res.hasRedAlert) {
+                alerts.push({ type: 'RED', message: res.alertMessage || 'Alerta roja', reservationNumber: res.reservationNumber, roomNumber: res.room?.number });
+            }
+            if (res.hasYellowAlert) {
+                alerts.push({ type: 'YELLOW', message: res.alertMessage || 'Alerta amarilla', reservationNumber: res.reservationNumber, roomNumber: res.room?.number });
+            }
+        }
+
+        // Alerta de late check-out
+        const now = new Date();
+        const checkOutTime = new Date(now);
+        checkOutTime.setHours(14, 0, 0, 0);
+        for (const res of activeReservations) {
+            if (res.checkOut && new Date(res.checkOut) < checkOutTime && now > checkOutTime) {
+                alerts.push({ type: 'LATE_CHECKOUT', message: 'Check-out vencido', reservationNumber: res.reservationNumber, roomNumber: res.room?.number });
+            }
+        }
+
         // Sincronizar habitaciones con reservas activas
         for (const reservation of activeReservations) {
             if (reservation.room && reservation.room.status !== RoomStatus.OCCUPIED) {
@@ -490,6 +553,7 @@ export class PmsService {
                 reservationNumber: r.reservationNumber,
                 guestName: r.guest ? `${r.guest.firstName} ${r.guest.lastName}` : 'Sin huésped',
                 roomNumber: r.room?.number,
+                roomId: r.room?.id,
                 checkIn: r.checkIn,
                 checkOut: r.checkOut,
                 status: r.status
@@ -498,9 +562,17 @@ export class PmsService {
                 reservationNumber: r.reservationNumber,
                 guestName: r.guest ? `${r.guest.firstName} ${r.guest.lastName}` : 'Sin huésped',
                 roomNumber: r.room?.number,
+                roomId: r.room?.id,
                 checkOut: r.checkOut,
                 status: r.status
             })),
+            stats: {
+                adr,
+                revpar,
+                avgStay: totalNights > 0 ? Math.round(totalNights / (recentReservations.length || 1)) : 0,
+                weeklyTrend: last7Days
+            },
+            alerts,
             rooms
         };
     }
@@ -1805,6 +1877,41 @@ async globalSearch(companyId: string, q: string) {
         }
         
         return this.reservationRepo.save(reservation);
+    }
+
+    async extendStay(reservationId: string, additionalDays: number) {
+        const reservation = await this.reservationRepo.findOne({ where: { id: reservationId }, relations: ['room'] });
+        if (!reservation) throw new Error('Reserva no encontrada');
+        
+        const currentCheckOut = new Date(reservation.checkOut);
+        currentCheckOut.setDate(currentCheckOut.getDate() + additionalDays);
+        reservation.checkOut = currentCheckOut;
+        
+        return this.reservationRepo.save(reservation);
+    }
+
+    async addCharge(reservationId: string, description: string, amount: number) {
+        const reservation = await this.reservationRepo.findOne({ where: { id: reservationId } });
+        if (!reservation) throw new Error('Reserva no encontrada');
+        
+        const invoice = this.invoiceRepo.create({
+            invoiceNumber: `INV-${Date.now()}`,
+            reservationId: reservation.id,
+            companyId: reservation.companyId,
+            issueDate: new Date(),
+            subtotal: amount,
+            tax: 0,
+            discount: 0,
+            total: amount,
+            paidAmount: 0,
+            pendingAmount: amount,
+            status: InvoiceStatus.DRAFT,
+            type: InvoiceType.SERVICE,
+            notes: description
+        });
+        await this.invoiceRepo.save(invoice);
+        
+        return invoice;
     }
 
     // ─── CASH DRAWER ─────────────────────────────────

@@ -307,6 +307,18 @@ export class PmsController {
         return this.pmsService.setAlert(id, body);
     }
 
+    @Patch('reservations/:id/extend')
+    @ApiOperation({ summary: 'Extend reservation stay' })
+    extendStay(@Param('id') id: string, @Body() body: { additionalDays: number }) {
+        return this.pmsService.extendStay(id, body.additionalDays);
+    }
+
+    @Post('reservations/:id/add-charge')
+    @ApiOperation({ summary: 'Add charge to reservation' })
+    addCharge(@Param('id') id: string, @Body() body: { description: string; amount: number }) {
+        return this.pmsService.addCharge(id, body.description, body.amount);
+    }
+
     @Get('reservations/search')
     @ApiOperation({ summary: 'Global search - by name, confirmation, ID' })
     globalSearch(@Req() req: any, @Query('q') q: string) {

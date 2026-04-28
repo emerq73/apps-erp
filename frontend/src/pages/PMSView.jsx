@@ -31,7 +31,7 @@ const s = {
     pageHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' },
     pageTitle: { fontSize: '22px', fontWeight: '800', color: 'var(--text-main)', margin: 0 },
     btnIcon: { display: 'flex', alignItems: 'center', padding: '8px', background: '#f1f5f9', border: 'none', borderRadius: '8px', cursor: 'pointer', color: 'var(--text-muted)' },
-    kpiGrid: { display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: '12px', marginBottom: '20px' },
+    kpiGrid: { display: 'grid', gridTemplateColumns: 'repeat(8,1fr)', gap: '12px', marginBottom: '20px' },
     kpiCard: { background: '#fff', border: '1px solid #e2e8f0', borderLeftWidth: '4px', borderRadius: '8px', padding: '16px' },
     kpiValue: { display: 'block', fontSize: '24px', fontWeight: '700', color: '#1e293b', lineHeight: 1 },
     kpiLabel: { display: 'block', fontSize: '13px', fontWeight: '600', marginTop: '4px' },
@@ -186,6 +186,10 @@ const PMSView = () => {
     const [roomTypeFilter, setRoomTypeFilter] = useState('ALL');
     const [sortOrder, setSortOrder] = useState('asc');
     const [selectedRoom, setSelectedRoom] = useState(null);
+    const [showWalkIn, setShowWalkIn] = useState(false);
+    const [roomHistory, setRoomHistory] = useState([]);
+    const [housekeepingStatus, setHousekeepingStatus] = useState({});
+    const [viewMode, setViewMode] = useState('grid');
 
     const fetchDashboard = async () => {
         try {
@@ -224,6 +228,121 @@ const PMSView = () => {
         }
     };
 
+    const handleExtendStay = async (roomId) => {
+        const { value: days } = await Swal.fire({
+            title: 'Extender estadía',
+            input: 'number',
+            inputLabel: 'Días adicionales',
+            inputPlaceholder: 'Cantidad de días',
+            showCancelButton: true
+        });
+        if (days) {
+            try {
+                const guests = dashboard.guestsPerRoom?.[roomId] || [];
+                if (guests[0]?.reservationNumber) {
+                    await api.patch(`/pms/reservations/${guests[0].reservationNumber}/extend`, { additionalDays: Number(days) });
+                    fetchDashboard();
+                    Swal.fire('Éxito', `Estadía extendida ${days} días`, 'success');
+                }
+            } catch (e) { Swal.fire('Error', 'No se pudo extender', 'error'); }
+        }
+    };
+
+    const handleAddCharge = async (roomId) => {
+        const { value: formValues } = await Swal.fire({
+            title: 'Agregar cargo a habitación',
+            html: '<input id="swal-description" class="swal2-input" placeholder="Descripción"><input id="swal-amount" type="number" class="swal2-input" placeholder="Monto">',
+            focusConfirm: false,
+            preConfirm: () => ({
+                description: document.getElementById('swal-description').value,
+                amount: document.getElementById('swal-amount').value
+            }),
+            showCancelButton: true
+        });
+        if (formValues?.description && formValues?.amount) {
+            try {
+                const guests = dashboard.guestsPerRoom?.[roomId] || [];
+                if (guests[0]?.reservationNumber) {
+                    await api.post(`/pms/reservations/${guests[0].reservationNumber}/add-charge`, { description: formValues.description, amount: Number(formValues.amount) });
+                    Swal.fire('Éxito', 'Cargo agregado', 'success');
+                }
+            } catch (e) { Swal.fire('Error', 'No se pudo agregar cargo', 'error'); }
+        }
+    };
+
+    const handleTransferRoom = async (roomId) => {
+        const availableRooms = dashboard?.rooms?.filter(r => r.status === 'AVAILABLE' && r.id !== roomId) || [];
+        if (availableRooms.length === 0) {
+            Swal.fire('No hay habitaciones disponibles para transferir');
+            return;
+        }
+        const { value: newRoomId } = await Swal.fire({
+            title: 'Transferir a habitación',
+            input: 'select',
+            inputOptions: Object.fromEntries(availableRooms.map(r => [r.id, `#${r.number} - ${r.roomType?.name}`])),
+            inputPlaceholder: 'Seleccionar habitación',
+            showCancelButton: true
+        });
+        if (newRoomId) {
+            try {
+                const guests = dashboard.guestsPerRoom?.[roomId] || [];
+                if (guests[0]?.reservationNumber) {
+                    await api.patch(`/pms/reservations/${guests[0].reservationNumber}/transfer`, { newRoomId });
+                    fetchDashboard();
+                    Swal.fire('Éxito', 'Huésped transferido', 'success');
+                }
+            } catch (e) { Swal.fire('Error', 'No se pudo transferir', 'error'); }
+        }
+    };
+
+    const handleCreateWalkIn = async (e) => {
+        e.preventDefault();
+        const form = e.target;
+        try {
+            await api.post('/pms/reservations/walk-in', {
+                guest: { firstName: form.guestFirstName.value, lastName: form.guestLastName.value, email: form.guestEmail.value, phone: form.guestPhone.value },
+                roomTypeId: form.roomTypeId.value,
+                checkIn: form.checkIn.value,
+                checkOut: form.checkOut.value,
+                adults: Number(form.adults.value),
+                children: Number(form.children.value)
+            });
+            Swal.fire('Éxito', 'Reserva walk-in creada', 'success');
+            setShowWalkIn(false);
+            fetchDashboard();
+        } catch (e) { Swal.fire('Error', 'No se pudo crear reserva', 'error'); }
+    };
+
+    const handleGenerateInvoice = async (roomId) => {
+        const guests = dashboard.guestsPerRoom?.[roomId] || [];
+        if (!guests[0]?.reservationNumber) {
+            Swal.fire('Error', 'No hay reserva para generar factura');
+            return;
+        }
+        try {
+            const res = await api.post(`/pms/invoices/from-reservation/${guests[0].reservationNumber}`);
+            Swal.fire('Éxito', `Factura ${res.data.invoiceNumber || 'generada'}`, 'success');
+        } catch (e) { Swal.fire('Error', 'No se pudo generar factura', 'error'); }
+    };
+
+    const handlePreAuthorize = async (roomId) => {
+        const { value: amount } = await Swal.fire({
+            title: 'Pre-autorizar tarjeta',
+            input: 'number',
+            inputLabel: 'Monto a pre-autorizar',
+            showCancelButton: true
+        });
+        if (amount) {
+            try {
+                const guests = dashboard.guestsPerRoom?.[roomId] || [];
+                if (guests[0]?.reservationNumber) {
+                    await api.post(`/pms/invoices/${guests[0].reservationNumber}/pre-authorize`, { amount: Number(amount) });
+                    Swal.fire('Éxito', 'Pre-autorización creada', 'success');
+                }
+            } catch (e) { Swal.fire('Error', 'No se pudo pre-autorizar', 'error'); }
+        }
+    };
+
     const tabs = [
         { id: 'dashboard', label: 'Tablero', icon: <BarChart2 size={18} /> },
         { id: 'search', label: 'Buscar', icon: <Search size={18} /> },
@@ -232,6 +351,9 @@ const PMSView = () => {
         { id: 'guests', label: 'Huéspedes', icon: <Users size={18} /> },
         { id: 'reservations', label: 'Reservas', icon: <Calendar size={18} /> },
         { id: 'calendar', label: 'Calendario', icon: <Calendar size={18} /> },
+        { id: 'housekeeping', label: 'Limpieza', icon: <span>🧹</span> },
+        { id: 'maintenance', label: 'Mantenimiento', icon: <span>🔧</span> },
+        { id: 'restaurant', label: 'Restaurante', icon: <span>🍽️</span> },
         { id: 'cashDrawer', label: 'Caja', icon: <Wallet size={18} /> },
         { id: 'rates', label: 'Tarifas', icon: <span>$</span> },
         { id: 'reports', label: 'Reportes', icon: <BarChart2 size={18} /> },
@@ -266,6 +388,9 @@ const PMSView = () => {
                         <button style={s.btnSec} onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}>
                             {sortOrder === 'asc' ? '↑' : '↓'} Orden
                         </button>
+                        <button style={s.btnSec} onClick={() => setViewMode(viewMode === 'grid' ? 'map' : 'grid')}>
+                            {viewMode === 'grid' ? '🗺️ Mapa' : '📋 Lista'}
+                        </button>
                     </div>
 
                     <div style={s.kpiGrid}>
@@ -275,7 +400,38 @@ const PMSView = () => {
                         <div style={{ ...s.kpiCard, borderLeft: '4px solid #8b5cf6' }}><span style={{ ...s.kpiLabel, color: '#8b5cf6' }}>Limpieza</span><span style={s.kpiValue}>{dashboard?.cleaning || 0}</span></div>
                         <div style={{ ...s.kpiCard, borderLeft: '4px solid #ef4444' }}><span style={{ ...s.kpiLabel, color: '#ef4444' }}>Mantenimiento</span><span style={s.kpiValue}>{dashboard?.maintenance || 0}</span></div>
                         <div style={{ ...s.kpiCard, borderLeft: '4px solid #0ea5e9' }}><span style={{ ...s.kpiLabel, color: '#0ea5e9' }}>Ocupación</span><span style={s.kpiValue}>{dashboard?.occupancyRate || 0}%</span></div>
+                        <div style={{ ...s.kpiCard, borderLeft: '4px solid #ec4899' }}><span style={{ ...s.kpiLabel, color: '#ec4899' }}>ADR</span><span style={s.kpiValue}>${dashboard?.stats?.adr?.toLocaleString() || 0}</span></div>
+                        <div style={{ ...s.kpiCard, borderLeft: '4px solid #14b8a6' }}><span style={{ ...s.kpiLabel, color: '#14b8a6' }}>RevPAR</span><span style={s.kpiValue}>${dashboard?.stats?.revpar?.toLocaleString() || 0}</span></div>
                     </div>
+
+                    {dashboard?.stats?.weeklyTrend?.length > 0 && (
+                        <div style={{ marginBottom: '16px', padding: '12px', background: '#f8fafc', borderRadius: '8px' }}>
+                            <div style={{ fontWeight: '700', color: '#1e293b', marginBottom: '8px' }}>Tendencia Semanal (Últimos 7 días)</div>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end', height: '80px' }}>
+                                {dashboard.stats.weeklyTrend.map((day, i) => {
+                                    const maxVal = Math.max(...dashboard.stats.weeklyTrend.map(d => d.revenue || 1), 1);
+                                    const height = Math.max((day.revenue / maxVal) * 60, 4);
+                                    return (
+                                        <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                            <div style={{ width: '100%', height: `${height}px`, background: '#3b82f6', borderRadius: '4px 4px 0 0' }} title={`$${day.revenue?.toLocaleString() || 0}`}></div>
+                                            <div style={{ fontSize: '9px', color: '#64748b', marginTop: '4px' }}>{new Date(day.date).toLocaleDateString('es-DO', { weekday: 'short' })}</div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+
+                    {dashboard?.alerts?.length > 0 && (
+                        <div style={{ marginBottom: '16px', padding: '12px', background: '#fef2f2', borderRadius: '8px', border: '1px solid #fecaca' }}>
+                            <div style={{ fontWeight: '700', color: '#dc2626', marginBottom: '8px' }}>Alertas ({dashboard.alerts.length})</div>
+                            {dashboard.alerts.map((alert, i) => (
+                                <div key={i} style={{ fontSize: '12px', padding: '4px 0', color: alert.type === 'RED' ? '#dc2626' : alert.type === 'YELLOW' ? '#d97706' : '#92400e' }}>
+                                    {alert.type === 'RED' ? '🔴' : alert.type === 'YELLOW' ? '🟡' : '⏰'} {alert.message} - Hab. #{alert.roomNumber} ({alert.reservationNumber})
+                                </div>
+                            ))}
+                        </div>
+                    )}
 
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
                         <div style={{ padding: '12px', background: '#ecfdf5', borderRadius: '8px', border: '1px solid #a7f3d0' }}>
@@ -300,36 +456,54 @@ const PMSView = () => {
                             if (roomTypeFilter !== 'ALL' && room.roomType?.id !== roomTypeFilter) return false;
                             return true;
                         }).sort((a, b) => sortOrder === 'asc' ? a.number - b.number : b.number - a.number).map(room => {
-                            const guests = dashboard.guestsPerRoom?.[room.id] || [];
+                            const roomId = room.id?.toString();
+                            const guests = roomId ? (dashboard.guestsPerRoom?.[roomId] || []) : [];
+                            const currentGuest = guests[0];
+                            const isOccupied = room.status === 'OCCUPIED' || guests.length > 0;
                             return (
                             <div key={room.id} onClick={() => setSelectedRoom(room.id === selectedRoom ? null : room.id)} style={{ ...s.roomCard, borderColor: STATUS_CONFIG[room.status]?.color || '#e2e8f0', cursor: 'pointer' }}>
                                 <div style={s.roomNumber}>#{room.number}</div>
                                 <div style={s.roomType}>{room.roomType?.name}</div>
                                 <div style={{ ...s.roomBadge, background: STATUS_CONFIG[room.status]?.bg, color: STATUS_CONFIG[room.status]?.color }}>{STATUS_CONFIG[room.status]?.label}</div>
-                                {guests.length > 0 && (
+                                {currentGuest && (
                                     <div style={{ marginTop: '8px', padding: '8px', background: '#f8fafc', borderRadius: '4px', fontSize: '12px' }}>
-                                        <div style={{ fontWeight: '600', color: '#1e293b' }}>{guests[0].guestName}</div>
-                                        <div style={{ color: '#64748b', fontSize: '11px' }}>Salida: {guests[0].checkOut ? new Date(guests[0].checkOut).toLocaleDateString('es-DO') : '-'}</div>
-                                        {guests[0].hasRedAlert && <span style={{ color: '#ef4444', fontSize: '10px', fontWeight: '600' }}> ⚠</span>}
-                                        {guests[0].hasYellowAlert && <span style={{ color: '#f59e0b', fontSize: '10px', fontWeight: '600' }}> ⚠</span>}
+                                        <div style={{ fontWeight: '600', color: '#1e293b' }}>{currentGuest.guestName || 'Sin huésped'}</div>
+                                        <div style={{ color: '#64748b', fontSize: '11px' }}>Salida: {currentGuest.checkOut ? new Date(currentGuest.checkOut).toLocaleDateString('es-DO') : '-'}</div>
+                                        {currentGuest.hasRedAlert && <span style={{ color: '#ef4444', fontSize: '10px', fontWeight: '600' }}> ⚠</span>}
+                                        {currentGuest.hasYellowAlert && <span style={{ color: '#f59e0b', fontSize: '10px', fontWeight: '600' }}> ⚠</span>}
                                     </div>
                                 )}
-                                {selectedRoom === room.id && guests.length > 0 && (
-                                    <div style={{ marginTop: '8px', display: 'flex', gap: '6px' }}>
-                                        <button style={{ ...s.btnSec, padding: '6px 10px', fontSize: '11px', flex: 1 }} onClick={(e) => { e.stopPropagation(); Swal.fire({ title: `Habitación #${room.number}`, html: `<div style="text-align:left;font-size:13px">
-                                            <strong>Huésped:</strong> ${guests[0].guestName}<br/>
-                                            <strong>Email:</strong> ${guests[0].guestEmail || '-'}<br/>
-                                            <strong>Teléfono:</strong> ${guests[0].guestPhone || '-'}<br/>
-                                            <strong>Check-in:</strong> ${guests[0].actualCheckIn ? new Date(guests[0].actualCheckIn).toLocaleString('es-DO') : guests[0].checkIn ? new Date(guests[0].checkIn).toLocaleDateString('es-DO') : '-'}<br/>
-                                            <strong>Check-out:</strong> ${guests[0].checkOut ? new Date(guests[0].checkOut).toLocaleDateString('es-DO') : '-'}<br/>
-                                            <strong>Reserva:</strong> ${guests[0].reservationNumber || '-'}<br/>
-                                            ${guests[0].alertMessage ? `<br/><strong style="color:${guests[0].hasRedAlert ? '#ef4444' : '#f59e0b'}">⚠ ${guests[0].alertMessage}</strong>` : ''}
+                                {selectedRoom === room.id && (
+                                    <div style={{ marginTop: '8px', display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                                        <button style={{ ...s.btnSec, padding: '4px 8px', fontSize: '10px', flex: 1 }} onClick={(e) => { e.stopPropagation(); Swal.fire({ title: `Habitación #${room.number}`, html: `<div style="text-align:left;font-size:13px">
+                                            <strong>Huésped:</strong> ${currentGuest?.guestName || '-'}<br/>
+                                            <strong>Email:</strong> ${currentGuest?.guestEmail || '-'}<br/>
+                                            <strong>Teléfono:</strong> ${currentGuest?.guestPhone || '-'}<br/>
+                                            <strong>Check-in:</strong> ${currentGuest?.actualCheckIn ? new Date(currentGuest.actualCheckIn).toLocaleString('es-DO') : currentGuest?.checkIn ? new Date(currentGuest.checkIn).toLocaleDateString('es-DO') : '-'}<br/>
+                                            <strong>Check-out:</strong> ${currentGuest?.checkOut ? new Date(currentGuest.checkOut).toLocaleDateString('es-DO') : '-'}<br/>
+                                            <strong>Reserva:</strong> ${currentGuest?.reservationNumber || '-'}<br/>
+                                            ${currentGuest?.alertMessage ? `<br/><strong style="color:${currentGuest?.hasRedAlert ? '#ef4444' : '#f59e0b'}">⚠ ${currentGuest.alertMessage}</strong>` : ''}
                                         </div>`, icon: 'info' }); }}>
                                             Ver
                                         </button>
-                                        <button style={{ ...s.btnPrimary, padding: '6px 10px', fontSize: '11px', flex: 1, background: '#ef4444' }} onClick={(e) => { e.stopPropagation(); handleQuickCheckOut(room.id); }}>
+                                        {isOccupied && <button style={{ ...s.btnSec, padding: '4px 8px', fontSize: '10px', flex: 1 }} onClick={(e) => { e.stopPropagation(); handleExtendStay(room.id); }}>
+                                            +Días
+                                        </button>}
+                                        {isOccupied && <button style={{ ...s.btnSec, padding: '4px 8px', fontSize: '10px', flex: 1 }} onClick={(e) => { e.stopPropagation(); handleAddCharge(room.id); }}>
+                                            +Cargo
+                                        </button>}
+                                        {isOccupied && <button style={{ ...s.btnSec, padding: '4px 8px', fontSize: '10px', flex: 1 }} onClick={(e) => { e.stopPropagation(); handleTransferRoom(room.id); }}>
+                                            Transferir
+                                        </button>}
+                                        {isOccupied && <button style={{ ...s.btnSec, padding: '4px 8px', fontSize: '10px', flex: 1 }} onClick={(e) => { e.stopPropagation(); handleGenerateInvoice(room.id); }}>
+                                            Factura
+                                        </button>}
+                                        {isOccupied && <button style={{ ...s.btnSec, padding: '4px 8px', fontSize: '10px', flex: 1 }} onClick={(e) => { e.stopPropagation(); handlePreAuthorize(room.id); }}>
+                                            Pre-auth
+                                        </button>}
+                                        {isOccupied && <button style={{ ...s.btnPrimary, padding: '4px 8px', fontSize: '10px', flex: 1, background: '#ef4444' }} onClick={(e) => { e.stopPropagation(); handleQuickCheckOut(room.id); }}>
                                             Check-out
-                                        </button>
+                                        </button>}
                                     </div>
                                 )}
                                 <select style={s.statusSelect} value={room.status} onChange={(e) => handleStatusChange(room.id, e.target.value)}>
@@ -342,6 +516,32 @@ const PMSView = () => {
                             </div>
                             );
                         })}
+                    </div>
+
+                    <div style={{ marginTop: '24px', padding: '16px', background: '#f8fafc', borderRadius: '12px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                            <h3 style={{ margin: 0, fontSize: '16px' }}>Acciones Rápidas</h3>
+                            <button style={s.btnPrimary} onClick={() => setShowWalkIn(!showWalkIn)}>+ Walk-in</button>
+                        </div>
+                        {showWalkIn && (
+                            <form onSubmit={handleCreateWalkIn} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', padding: '16px', background: 'white', borderRadius: '8px' }}>
+                                <input name="guestFirstName" placeholder="Nombre" style={s.input} required />
+                                <input name="guestLastName" placeholder="Apellido" style={s.input} required />
+                                <input name="guestEmail" type="email" placeholder="Email" style={s.input} />
+                                <input name="guestPhone" placeholder="Teléfono" style={s.input} />
+                                <select name="roomTypeId" style={s.input} required>
+                                    <option value="">Seleccionar tipo</option>
+                                    {dashboard?.rooms?.filter((v,i,a)=>a.findIndex(t=>(t.roomType?.id===v.roomType?.id))===i).map(r => (
+                                        <option key={r.roomType?.id} value={r.roomType?.id}>{r.roomType?.name}</option>
+                                    ))}
+                                </select>
+                                <input name="adults" type="number" placeholder="Adultos" defaultValue={1} style={s.input} />
+                                <input name="children" type="number" placeholder="Niños" defaultValue={0} style={s.input} />
+                                <input name="checkIn" type="date" style={s.input} required />
+                                <input name="checkOut" type="date" style={s.input} required />
+                                <button type="submit" style={{ ...s.btnPrimary, gridColumn: '1 / -1' }}>Crear Reserva</button>
+                            </form>
+                        )}
                     </div>
                 </div>
             );
