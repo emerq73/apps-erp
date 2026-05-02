@@ -16,20 +16,20 @@ import { AuditSubscriber } from './audit.subscriber';
 import { JwtStrategy } from './jwt.strategy';
 
 @Module({
-    imports: [
-        TypeOrmModule.forFeature([User, Role, Permission, LoginAudit, AuditLog]),
-        PassportModule,
-        JwtModule.registerAsync({
-            imports: [ConfigModule],
-            useFactory: async (configService: ConfigService) => ({
-                secret: configService.get<string>('JWT_SECRET'),
-                signOptions: { expiresIn: '1h' },
-            }),
-            inject: [ConfigService],
-        }),
-    ],
-    controllers: [AuthController],
-    providers: [AuthService, JwtStrategy, AuditSubscriber],
-    exports: [AuthService, TypeOrmModule],
+  imports: [
+    TypeOrmModule.forFeature([User, Role, Permission, LoginAudit, AuditLog]),
+    PassportModule,
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      useFactory: async (configService: ConfigService) => ({
+        secret: configService.get<string>('JWT_SECRET'),
+        signOptions: { expiresIn: '1h' },
+      }),
+      inject: [ConfigService],
+    }),
+  ],
+  controllers: [AuthController],
+  providers: [AuthService, JwtStrategy, AuditSubscriber],
+  exports: [AuthService, TypeOrmModule],
 })
-export class AuthModule { }
+export class AuthModule {}

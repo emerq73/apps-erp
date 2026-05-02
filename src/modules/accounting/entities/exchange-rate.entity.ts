@@ -5,18 +5,18 @@ import { Company } from './company.entity';
 
 @Entity('exchange_rates')
 export class ExchangeRate extends BaseAuditEntity {
-    @ManyToOne(() => Currency)
-    baseCurrency: Currency;
+  @ManyToOne(() => Currency)
+  baseCurrency: Currency;
 
-    @ManyToOne(() => Currency)
-    targetCurrency: Currency;
+  @ManyToOne(() => Currency)
+  targetCurrency: Currency;
 
-    @Column({ type: 'date' })
-    date: Date;
+  @Column({ type: 'date' })
+  date: Date;
 
-    @Column({ type: 'decimal', precision: 18, scale: 6 })
-    rate: number;
+  @Column({ type: 'decimal', precision: 18, scale: 6 })
+  rate: number;
 
-    @ManyToOne(() => Company)
-    company: Company;
+  @ManyToOne(() => Company)
+  company: Company;
 }

@@ -5,21 +5,21 @@ import { Account } from './account.entity';
 
 @Entity('bank_accounts')
 export class BankAccount extends BaseAuditEntity {
-    @Column()
-    bankName: string;
+  @Column()
+  bankName: string;
 
-    @Column()
-    accountNumber: string;
+  @Column()
+  accountNumber: string;
 
-    @Column({ type: 'enum', enum: ['SAVINGS', 'CHECKING'] })
-    type: string;
+  @Column({ type: 'enum', enum: ['SAVINGS', 'CHECKING'] })
+  type: string;
 
-    @Column({ default: true })
-    isActive: boolean;
+  @Column({ default: true })
+  isActive: boolean;
 
-    @ManyToOne(() => Account)
-    account: Account;
+  @ManyToOne(() => Account)
+  account: Account;
 
-    @ManyToOne(() => Company)
-    company: Company;
+  @ManyToOne(() => Company)
+  company: Company;
 }

@@ -209,8 +209,7 @@ const PMSView = () => {
     const [sortOrder, setSortOrder] = useState('asc');
     const [selectedRoom, setSelectedRoom] = useState(null);
     const [showWalkIn, setShowWalkIn] = useState(false);
-    const [roomHistory, setRoomHistory] = useState([]);
-    const [housekeepingStatus, setHousekeepingStatus] = useState({});
+
     const [viewMode, setViewMode] = useState('grid');
 
     const fetchDashboard = async () => {
@@ -415,9 +414,6 @@ const PMSView = () => {
                         </select>
                         <button style={s.btnSec} onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}>
                             {sortOrder === 'asc' ? '↑' : '↓'} Orden
-                        </button>
-                        <button style={s.btnSec} onClick={() => setViewMode(viewMode === 'grid' ? 'map' : 'grid')}>
-                            {viewMode === 'grid' ? '🗺️ Mapa' : '📋 Lista'}
                         </button>
                     </div>
 

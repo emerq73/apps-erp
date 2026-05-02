@@ -6,12 +6,12 @@ import { PosController } from './pos.controller';
 import { PosService } from './pos.service';
 
 @Module({
-    imports: [
-        TypeOrmModule.forFeature([Sale, SaleItem, PosProduct]),
-        AccountingModule,
-    ],
-    controllers: [PosController],
-    providers: [PosService],
-    exports: [TypeOrmModule, PosService]
+  imports: [
+    TypeOrmModule.forFeature([Sale, SaleItem, PosProduct]),
+    AccountingModule,
+  ],
+  controllers: [PosController],
+  providers: [PosService],
+  exports: [TypeOrmModule, PosService],
 })
-export class PosModule { }
+export class PosModule {}

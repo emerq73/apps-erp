@@ -5,33 +5,33 @@ import { Company } from '../../accounting/entities/company.entity';
 
 @Entity('menu_items')
 export class MenuItem extends BaseAuditEntity {
-    @Column()
-    name: string;
+  @Column()
+  name: string;
 
-    @Column({ nullable: true })
-    description: string;
+  @Column({ nullable: true })
+  description: string;
 
-    @Column({ type: 'decimal', precision: 18, scale: 2 })
-    price: number;
+  @Column({ type: 'decimal', precision: 18, scale: 2 })
+  price: number;
 
-    @ManyToOne(() => MenuCategory)
-    category: MenuCategory;
+  @ManyToOne(() => MenuCategory)
+  category: MenuCategory;
 
-    @Column({ nullable: true })
-    categoryId: string;
+  @Column({ nullable: true })
+  categoryId: string;
 
-    @Column({ default: true })
-    isAvailable: boolean;
+  @Column({ default: true })
+  isAvailable: boolean;
 
-    @Column({ default: false })
-    isActive: boolean;
+  @Column({ default: false })
+  isActive: boolean;
 
-    @Column({ nullable: true })
-    imageUrl: string;
+  @Column({ nullable: true })
+  imageUrl: string;
 
-    @ManyToOne(() => Company)
-    company: Company;
+  @ManyToOne(() => Company)
+  company: Company;
 
-    @Column({ nullable: true })
-    companyId: string;
+  @Column({ nullable: true })
+  companyId: string;
 }

@@ -15,24 +15,60 @@ import { RestaurantTable } from './entities/restaurant-table.entity';
 import { MenuCategory } from './entities/menu-category.entity';
 import { MenuItem } from './entities/menu-item.entity';
 import { RestaurantOrder } from './entities/restaurant-order.entity';
-import { LoyaltyTier, LoyaltyPoints, LoyaltyTransaction, LoyaltyRedemption } from './entities/loyalty.entity';
-import { CashDrawer, CashDrawerTransaction } from './entities/cash-drawer.entity';
-import { ReservationAlert, PaymentSplit, DepositTransfer, SharedInventoryLink } from './entities/pms-extensions.entity';
+import {
+  LoyaltyTier,
+  LoyaltyPoints,
+  LoyaltyTransaction,
+  LoyaltyRedemption,
+} from './entities/loyalty.entity';
+import {
+  CashDrawer,
+  CashDrawerTransaction,
+} from './entities/cash-drawer.entity';
+import {
+  ReservationAlert,
+  PaymentSplit,
+  DepositTransfer,
+  SharedInventoryLink,
+} from './entities/pms-extensions.entity';
 import { PmsService } from './pms.service';
 import { PmsController } from './pms.controller';
 import { PmsPublicController } from './pms-public.controller';
 import { AccountingModule } from '../accounting/accounting.module';
 
 @Module({
-    imports: [TypeOrmModule.forFeature([
-        RoomType, Room, Guest, Reservation, RoomRate, CancellationPolicy, Invoice, 
-        CleaningRequest, HousekeepingStaff, MaintenanceRequest, MaintenanceStaff,
-        RestaurantTable, MenuCategory, MenuItem, RestaurantOrder,
-        LoyaltyTier, LoyaltyPoints, LoyaltyTransaction, LoyaltyRedemption,
-        CashDrawer, CashDrawerTransaction, ReservationAlert, PaymentSplit, DepositTransfer, SharedInventoryLink
-    ]), AccountingModule],
-    providers: [PmsService],
-    controllers: [PmsController, PmsPublicController],
-    exports: [TypeOrmModule, PmsService]
+  imports: [
+    TypeOrmModule.forFeature([
+      RoomType,
+      Room,
+      Guest,
+      Reservation,
+      RoomRate,
+      CancellationPolicy,
+      Invoice,
+      CleaningRequest,
+      HousekeepingStaff,
+      MaintenanceRequest,
+      MaintenanceStaff,
+      RestaurantTable,
+      MenuCategory,
+      MenuItem,
+      RestaurantOrder,
+      LoyaltyTier,
+      LoyaltyPoints,
+      LoyaltyTransaction,
+      LoyaltyRedemption,
+      CashDrawer,
+      CashDrawerTransaction,
+      ReservationAlert,
+      PaymentSplit,
+      DepositTransfer,
+      SharedInventoryLink,
+    ]),
+    AccountingModule,
+  ],
+  providers: [PmsService],
+  controllers: [PmsController, PmsPublicController],
+  exports: [TypeOrmModule, PmsService],
 })
 export class PmsModule {}

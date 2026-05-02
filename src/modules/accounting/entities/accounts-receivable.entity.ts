@@ -4,47 +4,47 @@ import { Company } from './company.entity';
 import { ThirdParty } from './third-party.entity';
 
 export enum InvoiceStatus {
-    PENDING = 'PENDING',
-    PARTIAL = 'PARTIAL',
-    PAID = 'PAID',
-    CANCELLED = 'CANCELLED'
+  PENDING = 'PENDING',
+  PARTIAL = 'PARTIAL',
+  PAID = 'PAID',
+  CANCELLED = 'CANCELLED',
 }
 
 @Entity('accounts_receivable')
 export class AccountsReceivable extends BaseAuditEntity {
-    @Column()
-    invoiceNumber: string;
+  @Column()
+  invoiceNumber: string;
 
-    @Column({ type: 'date' })
-    issueDate: Date;
+  @Column({ type: 'date' })
+  issueDate: Date;
 
-    @Column({ type: 'date' })
-    dueDate: Date;
+  @Column({ type: 'date' })
+  dueDate: Date;
 
-    @Column({ type: 'decimal', precision: 18, scale: 2 })
-    totalAmount: number;
+  @Column({ type: 'decimal', precision: 18, scale: 2 })
+  totalAmount: number;
 
-    @Column({ type: 'decimal', precision: 18, scale: 2, default: 0 })
-    paidAmount: number;
+  @Column({ type: 'decimal', precision: 18, scale: 2, default: 0 })
+  paidAmount: number;
 
-    @Column({ type: 'decimal', precision: 18, scale: 2 })
-    balance: number;
+  @Column({ type: 'decimal', precision: 18, scale: 2 })
+  balance: number;
 
-    @Column({
-        type: 'enum',
-        enum: InvoiceStatus,
-        default: InvoiceStatus.PENDING
-    })
-    status: InvoiceStatus;
+  @Column({
+    type: 'enum',
+    enum: InvoiceStatus,
+    default: InvoiceStatus.PENDING,
+  })
+  status: InvoiceStatus;
 
-    @Column({ nullable: true })
-    notes: string;
+  @Column({ nullable: true })
+  notes: string;
 
-    @ManyToOne(() => ThirdParty)
-    @JoinColumn({ name: 'customerId' })
-    customer: ThirdParty;
+  @ManyToOne(() => ThirdParty)
+  @JoinColumn({ name: 'customerId' })
+  customer: ThirdParty;
 
-    @ManyToOne(() => Company)
-    @JoinColumn({ name: 'companyId' })
-    company: Company;
+  @ManyToOne(() => Company)
+  @JoinColumn({ name: 'companyId' })
+  company: Company;
 }

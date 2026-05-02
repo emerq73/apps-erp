@@ -5,15 +5,15 @@ import { Account } from './account.entity';
 
 @Entity('cash_boxes')
 export class CashBox extends BaseAuditEntity {
-    @Column()
-    name: string;
+  @Column()
+  name: string;
 
-    @Column({ default: true })
-    isActive: boolean;
+  @Column({ default: true })
+  isActive: boolean;
 
-    @ManyToOne(() => Account)
-    account: Account;
+  @ManyToOne(() => Account)
+  account: Account;
 
-    @ManyToOne(() => Company)
-    company: Company;
+  @ManyToOne(() => Company)
+  company: Company;
 }

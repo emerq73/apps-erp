@@ -4,15 +4,15 @@ import { Company } from '../../accounting/entities/company.entity';
 
 @Entity('warehouses')
 export class Warehouse extends BaseAuditEntity {
-    @Column()
-    name: string;
+  @Column()
+  name: string;
 
-    @Column({ nullable: true })
-    location: string;
+  @Column({ nullable: true })
+  location: string;
 
-    @Column({ default: true })
-    isActive: boolean;
+  @Column({ default: true })
+  isActive: boolean;
 
-    @ManyToOne(() => Company)
-    company: Company;
+  @ManyToOne(() => Company)
+  company: Company;
 }

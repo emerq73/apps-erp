@@ -20,45 +20,61 @@ import { AccountsReceivable } from './entities/accounts-receivable.entity';
 import { Currency } from './entities/currency.entity';
 import { ExchangeRate } from './entities/exchange-rate.entity';
 
-import { RecurringEntry, RecurringEntryLog } from './entities/recurring-entry.entity';
-import { ApprovalWorkflow, ApprovalRequest, ApprovalHistory } from './entities/approval-workflow.entity';
+import {
+  RecurringEntry,
+  RecurringEntryLog,
+} from './entities/recurring-entry.entity';
+import {
+  ApprovalWorkflow,
+  ApprovalRequest,
+  ApprovalHistory,
+} from './entities/approval-workflow.entity';
 import { AuditTrail, AuditSession } from './entities/audit-trail.entity';
-import { Project, ProjectTransaction, ProjectBudgetLine } from './entities/project.entity';
-import { FixedAsset as FixedAssetV2, AssetDepreciationLog } from './entities/fixed-asset-v2.entity';
+import {
+  Project,
+  ProjectTransaction,
+  ProjectBudgetLine,
+} from './entities/project.entity';
+import {
+  FixedAsset as FixedAssetV2,
+  AssetDepreciationLog,
+} from './entities/fixed-asset-v2.entity';
 
 @Module({
-    imports: [TypeOrmModule.forFeature([
-        Account,
-        Transaction,
-        ThirdParty,
-        CostCenter,
-        Voucher,
-        JournalEntry,
-        Company,
-        Tax,
-        AccountingPeriod,
-        Budget,
-        CashBox,
-        BankAccount,
-        AccountsPayable,
-        AccountsReceivable,
-        Currency,
-        ExchangeRate,
-        RecurringEntry,
-        RecurringEntryLog,
-        ApprovalWorkflow,
-        ApprovalRequest,
-        ApprovalHistory,
-        AuditTrail,
-        AuditSession,
-        Project,
-        ProjectTransaction,
-        ProjectBudgetLine,
-        FixedAssetV2,
-        AssetDepreciationLog,
-    ])],
-    controllers: [AccountingController],
-    providers: [AccountingService],
-    exports: [AccountingService],
+  imports: [
+    TypeOrmModule.forFeature([
+      Account,
+      Transaction,
+      ThirdParty,
+      CostCenter,
+      Voucher,
+      JournalEntry,
+      Company,
+      Tax,
+      AccountingPeriod,
+      Budget,
+      CashBox,
+      BankAccount,
+      AccountsPayable,
+      AccountsReceivable,
+      Currency,
+      ExchangeRate,
+      RecurringEntry,
+      RecurringEntryLog,
+      ApprovalWorkflow,
+      ApprovalRequest,
+      ApprovalHistory,
+      AuditTrail,
+      AuditSession,
+      Project,
+      ProjectTransaction,
+      ProjectBudgetLine,
+      FixedAssetV2,
+      AssetDepreciationLog,
+    ]),
+  ],
+  controllers: [AccountingController],
+  providers: [AccountingService],
+  exports: [AccountingService],
 })
-export class AccountingModule { }
+export class AccountingModule {}

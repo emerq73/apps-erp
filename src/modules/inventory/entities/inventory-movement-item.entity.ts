@@ -5,15 +5,15 @@ import { Product } from './product.entity';
 
 @Entity('inventory_movement_items')
 export class InventoryMovementItem extends BaseAuditEntity {
-    @Column({ type: 'decimal', precision: 18, scale: 2 })
-    quantity: number;
+  @Column({ type: 'decimal', precision: 18, scale: 2 })
+  quantity: number;
 
-    @Column({ type: 'decimal', precision: 18, scale: 2, default: 0 })
-    unitCost: number;
+  @Column({ type: 'decimal', precision: 18, scale: 2, default: 0 })
+  unitCost: number;
 
-    @ManyToOne(() => Product)
-    product: Product;
+  @ManyToOne(() => Product)
+  product: Product;
 
-    @ManyToOne(() => InventoryMovement, movement => movement.items)
-    movement: InventoryMovement;
+  @ManyToOne(() => InventoryMovement, (movement) => movement.items)
+  movement: InventoryMovement;
 }
