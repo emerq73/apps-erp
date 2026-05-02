@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource, In, ILike } from 'typeorm';
+import { Repository, DataSource, In, ILike, Raw } from 'typeorm';
 import { Room, RoomStatus } from './entities/room.entity';
 import { RoomType } from './entities/room-type.entity';
 import { Guest } from './entities/guest.entity';
@@ -116,7 +116,8 @@ export class PmsService {
     }
 
     async updateRoomStatus(id: string, status: RoomStatus, data?: { issue?: string; notes?: string }) {
-        const room = await this.roomRepo.findOne({ where: { id } });
+        const room = await this.roomRepo.findOne({ where: { id }, relations: ['company'] });
+        const companyId = room?.companyId || room?.company?.id;
         
         if (status === RoomStatus.MAINTENANCE && room?.status !== RoomStatus.MAINTENANCE) {
             const existingPending = await this.maintenanceRepo.findOne({
@@ -126,7 +127,7 @@ export class PmsService {
             if (!existingPending) {
                 await this.maintenanceRepo.save({
                     roomId: id,
-                    companyId: room?.companyId,
+                    companyId: companyId,
                     requestedDate: new Date(),
                     issue: data?.issue || 'Mantenimiento solicitado desde tablero',
                     description: data?.notes || '',
@@ -144,6 +145,16 @@ export class PmsService {
         }
         
         await this.roomRepo.update(id, { status });
+
+        // Automatización: Si el estado cambia a CLEANING o MAINTENANCE, crear solicitud automáticamente
+        if (companyId) {
+            if (status === RoomStatus.CLEANING) {
+                await this.createCleaningRequest(companyId, { roomId: id, type: 'TURNOVER' });
+            } else if (status === RoomStatus.MAINTENANCE) {
+                await this.createMaintenanceRequest(companyId, { roomId: id, notes: 'Creado automáticamente desde el tablero' });
+            }
+        }
+
         return this.roomRepo.findOne({ where: { id }, relations: ['roomType'] });
     }
 
@@ -387,6 +398,13 @@ export class PmsService {
 
     // ─── REPORTS ──────────────────────────────────────────────
     async getOccupancyDashboard(companyId: string) {
+        const [available, occupied, cleaning, maintenance] = await Promise.all([
+            this.roomRepo.count({ where: { company: { id: companyId }, status: RoomStatus.AVAILABLE } }),
+            this.roomRepo.count({ where: { company: { id: companyId }, status: RoomStatus.OCCUPIED } }),
+            this.roomRepo.count({ where: { company: { id: companyId }, status: RoomStatus.CLEANING } }),
+            this.roomRepo.count({ where: { company: { id: companyId }, status: RoomStatus.MAINTENANCE } }),
+        ]);
+
         const rooms = await this.roomRepo.find({
             where: { companyId },
             relations: ['roomType']
@@ -469,21 +487,8 @@ export class PmsService {
             }
         }
 
-        // IDs de habitaciones ocupadas por reservas
-        const occupiedRoomIds = new Set(
-            activeReservations
-                .map(r => r.room?.id)
-                .filter(id => id)
-        );
-
-        const adr = occupiedRoomIds.size > 0 ? Math.round(totalRevenue / occupiedRoomIds.size) : 0;
+        const adr = occupied > 0 ? Math.round(totalRevenue / occupied) : 0;
         const revpar = rooms.length > 0 ? Math.round(totalRevenue / rooms.length) : 0;
-
-        // Calcular estado basado en reservas, no solo en room.status
-        const occupied = occupiedRoomIds.size;
-        const available = rooms.filter(r => !occupiedRoomIds.has(r.id) && r.status === RoomStatus.AVAILABLE).length;
-        const maintenance = rooms.filter(r => !occupiedRoomIds.has(r.id) && r.status === RoomStatus.MAINTENANCE).length;
-        const cleaning = rooms.filter(r => !occupiedRoomIds.has(r.id) && r.status === RoomStatus.CLEANING).length;
 
         // Generar alertas
         const alerts: any[] = [];
@@ -524,6 +529,7 @@ export class PmsService {
                 }
                 guestsPerRoom[res.roomId].push({
                     guestId: res.guestId,
+                    reservationId: res.id,
                     guestName: res.guest ? `${res.guest.firstName} ${res.guest.lastName}` : 'Sin huésped',
                     guestEmail: res.guest?.email || '',
                     guestPhone: res.guest?.phone || '',
@@ -575,6 +581,51 @@ export class PmsService {
             alerts,
             rooms
         };
+    }
+
+    async getTapeChart(companyId: string, start: string, end: string) {
+        const startDate = new Date(start);
+        const endDate = new Date(end);
+
+        const roomTypes = await this.roomTypeRepo.find({
+            where: { company: { id: companyId } },
+            relations: ['rooms'],
+            order: { name: 'ASC' }
+        });
+
+        const reservations = await this.reservationRepo.find({
+            where: {
+                companyId,
+                status: In([ReservationStatus.PENDING, ReservationStatus.CONFIRMED, ReservationStatus.CHECKED_IN, ReservationStatus.BLOCKED]),
+                checkIn: Raw(alias => `${alias} < :end`, { end: endDate }),
+                checkOut: Raw(alias => `${alias} > :start`, { start: startDate })
+            },
+            relations: ['room', 'guest']
+        });
+
+        // Agrupar habitaciones por tipo para el frontend
+        const grid = roomTypes.map(rt => ({
+            id: rt.id,
+            name: rt.name,
+            rooms: rt.rooms.map(r => ({
+                id: r.id,
+                number: r.number,
+                status: r.status,
+                reservations: reservations
+                    .filter(res => res.roomId === r.id)
+                    .map(res => ({
+                        id: res.id,
+                        number: res.reservationNumber,
+                        guestName: res.guest ? `${res.guest.firstName} ${res.guest.lastName}` : 'N/A',
+                        checkIn: res.checkIn,
+                        checkOut: res.checkOut,
+                        status: res.status,
+                        isUrgent: res.hasRedAlert
+                    }))
+            }))
+        }));
+
+        return grid;
     }
 
     // ─── GUESTS ──────────────────────────────────────────────
@@ -1231,21 +1282,26 @@ export class PmsService {
     }
 
     async getCleaningStats(companyId: string) {
-        const today = new Date().toISOString().split('T')[0];
         const pending = await this.cleaningRepo.count({
             where: { companyId, status: CleaningStatus.PENDING }
         });
-        const inProgress = await this.cleaningRepo.count({
+        const in_progress = await this.cleaningRepo.count({
             where: { companyId, status: CleaningStatus.IN_PROGRESS }
         });
-        const completed = await this.cleaningRepo.count({
-            where: { companyId, status: CleaningStatus.COMPLETED, scheduledDate: today as any }
-        });
-        const verified = await this.cleaningRepo.count({
-            where: { companyId, status: CleaningStatus.VERIFIED, scheduledDate: today as any }
-        });
+        
+        const completed = await this.cleaningRepo.createQueryBuilder('req')
+            .where('req.companyId = :companyId', { companyId })
+            .andWhere('req.status = :status', { status: CleaningStatus.COMPLETED })
+            .andWhere('req.completedDate = CURRENT_DATE')
+            .getCount();
 
-        return { pending, inProgress, completed, verified, total: pending + inProgress };
+        const verified = await this.cleaningRepo.createQueryBuilder('req')
+            .where('req.companyId = :companyId', { companyId })
+            .andWhere('req.status = :status', { status: CleaningStatus.VERIFIED })
+            .andWhere('req.verifiedAt >= CURRENT_DATE')
+            .getCount();
+
+        return { pending, in_progress, completed, verified, total: pending + in_progress };
     }
 
     async createCleaningRequest(companyId: string, data: any) {
@@ -1265,14 +1321,32 @@ export class PmsService {
         const req = await this.cleaningRepo.findOne({ where: { id } });
         if (!req) throw new Error('Solicitud no encontrada');
 
-        if (data.status === CleaningStatus.IN_PROGRESS && !req.scheduledTime) {
-            const now = new Date();
-            req.scheduledTime = now.toTimeString().slice(0, 5);
+        if (data.status === CleaningStatus.IN_PROGRESS && !req.startedAt) {
+            req.startedAt = new Date();
+            if (!req.scheduledTime) req.scheduledTime = new Date().toTimeString().slice(0, 5);
         }
         if (data.status === CleaningStatus.COMPLETED) {
             const now = new Date();
             req.completedDate = now;
             req.completedTime = now.toTimeString().slice(0, 5);
+            
+            // Procesar cargos de minibar si existen
+            if (data.minibarConsumptions && data.minibarConsumptions.length > 0) {
+                try {
+                    const reservation = await this.reservationRepo.findOne({
+                        where: { roomId: req.roomId, status: ReservationStatus.CHECKED_IN },
+                        relations: ['room']
+                    });
+
+                    if (reservation) {
+                        for (const item of data.minibarConsumptions) {
+                            await this.addCharge(reservation.id, `Minibar: ${item.name} (x${item.quantity})`, Number(item.price) * item.quantity);
+                        }
+                    }
+                } catch (e) {
+                    console.error('Error posteando cargos de minibar:', e);
+                }
+            }
         }
         if (data.status === CleaningStatus.VERIFIED) {
             req.verifiedAt = new Date();
@@ -1402,7 +1476,13 @@ export class PmsService {
         const completed = await this.maintenanceRepo.count({ where: { companyId, status: MaintenanceStatus.COMPLETED } });
         const verified = await this.maintenanceRepo.count({ where: { companyId, status: MaintenanceStatus.VERIFIED } });
 
-        return { pending, inProgress, completed, verified, total: pending + inProgress };
+        return { 
+            pending, 
+            in_progress: inProgress, 
+            completed, 
+            verified, 
+            total: pending + inProgress 
+        };
     }
 
     async createMaintenanceRequest(companyId: string, data: any) {

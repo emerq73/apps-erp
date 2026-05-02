@@ -253,6 +253,12 @@ export class PmsController {
         return this.pmsService.getReservationsForCalendar(companyId, start, end);
     }
 
+    @Get('tape-chart')
+    @ApiOperation({ summary: 'Get data for interactive tape chart' })
+    getTapeChart(@Req() req: any, @Query('start') start: string, @Query('end') end: string) {
+        return this.pmsService.getTapeChart(this.getCompanyId(req), start, end);
+    }
+
     @Get('reservations/:id')
     getReservation(@Param('id') id: string) {
         return this.pmsService.getReservation(id);
@@ -276,8 +282,13 @@ export class PmsController {
 
     @Patch('reservations/:id/check-out')
     @ApiOperation({ summary: 'Check-out with notes' })
-    checkOut(@Param('id') id: string, @Body() body: { forceLateCheckout?: boolean; applyLateFee?: boolean; keyCardReturned?: boolean; notes?: string }) {
-        return this.pmsService.checkOut(id, body);
+    async checkOut(@Param('id') id: string, @Body() body: { forceLateCheckout?: boolean; applyLateFee?: boolean; keyCardReturned?: boolean; notes?: string }) {
+        try {
+            return await this.pmsService.checkOut(id, body);
+        } catch (error) {
+            console.error('Check-out error:', error);
+            throw error;
+        }
     }
 
     @Patch('reservations/:id/confirm')

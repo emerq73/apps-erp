@@ -20,6 +20,7 @@ import { CashDrawer, CashDrawerTransaction } from './entities/cash-drawer.entity
 import { ReservationAlert, PaymentSplit, DepositTransfer, SharedInventoryLink } from './entities/pms-extensions.entity';
 import { PmsService } from './pms.service';
 import { PmsController } from './pms.controller';
+import { PmsPublicController } from './pms-public.controller';
 import { AccountingModule } from '../accounting/accounting.module';
 
 @Module({
@@ -31,7 +32,7 @@ import { AccountingModule } from '../accounting/accounting.module';
         CashDrawer, CashDrawerTransaction, ReservationAlert, PaymentSplit, DepositTransfer, SharedInventoryLink
     ]), AccountingModule],
     providers: [PmsService],
-    controllers: [PmsController],
+    controllers: [PmsController, PmsPublicController],
     exports: [TypeOrmModule, PmsService]
 })
 export class PmsModule {}

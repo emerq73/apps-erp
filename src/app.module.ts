@@ -1,4 +1,4 @@
-import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
+import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common'; 
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { join } from 'path';
@@ -27,7 +27,7 @@ import { TenantMiddleware } from './common/middleware/tenant.middleware';
         password: configService.get<string>('DB_PASSWORD'),
         database: configService.get<string>('DB_NAME'),
         entities: [join(__dirname, '**', '*.entity.{ts,js}')],
-        synchronize: configService.get<boolean>('DB_SYNCHRONIZE'),
+        synchronize: configService.get<string>('DB_SYNCHRONIZE') === 'true',
       }),
       inject: [ConfigService],
     }),

@@ -24,7 +24,6 @@ import { RecurringEntry, RecurringEntryLog } from './entities/recurring-entry.en
 import { ApprovalWorkflow, ApprovalRequest, ApprovalHistory } from './entities/approval-workflow.entity';
 import { AuditTrail, AuditSession } from './entities/audit-trail.entity';
 import { Project, ProjectTransaction, ProjectBudgetLine } from './entities/project.entity';
-import { FixedAsset } from './entities/fixed-asset.entity';
 import { FixedAsset as FixedAssetV2, AssetDepreciationLog } from './entities/fixed-asset-v2.entity';
 
 @Module({
@@ -55,7 +54,6 @@ import { FixedAsset as FixedAssetV2, AssetDepreciationLog } from './entities/fix
         Project,
         ProjectTransaction,
         ProjectBudgetLine,
-        FixedAsset,
         FixedAssetV2,
         AssetDepreciationLog,
     ])],

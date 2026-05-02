@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import LoginPage from './pages/LoginPage';
 import ForgotPassword from './pages/ForgotPassword';
 import CompanySelection from './pages/CompanySelection';
+import BookingEngine from './pages/BookingEngine';
 
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 
@@ -30,13 +31,16 @@ function App() {
     return (
         <Router>
             <Routes>
-                <Route 
-                    path="/login" 
-                    element={isAuthenticated ? <Navigate to={isSessionReady ? "/dashboard" : "/select-session"} /> : <LoginPage onLogin={() => setIsAuthenticated(true)} />} 
+                {/* ── Ruta pública: Motor de Reservas (sin autenticación) ── */}
+                <Route path="/booking/:companyId" element={<BookingEngine />} />
+
+                <Route
+                    path="/login"
+                    element={isAuthenticated ? <Navigate to={isSessionReady ? "/dashboard" : "/select-session"} /> : <LoginPage onLogin={() => setIsAuthenticated(true)} />}
                 />
-                <Route 
-                    path="/select-session" 
-                    element={isAuthenticated ? (isSessionReady ? <Navigate to="/dashboard" /> : <CompanySelection onSelectionComplete={() => window.location.reload()} onLogout={() => { localStorage.clear(); setIsAuthenticated(false); }} />) : <Navigate to="/login" />} 
+                <Route
+                    path="/select-session"
+                    element={isAuthenticated ? (isSessionReady ? <Navigate to="/dashboard" /> : <CompanySelection onSelectionComplete={() => window.location.reload()} onLogout={() => { localStorage.clear(); setIsAuthenticated(false); }} />) : <Navigate to="/login" />}
                 />
                 <Route path="/forgot-password" element={<ForgotPassword />} />
                 <Route

@@ -11,6 +11,28 @@ import ReportManager from './pms/ReportManager';
 import HousekeepingManager from './pms/HousekeepingManager';
 import MaintenanceManager from './pms/MaintenanceManager';
 import RestaurantManager from './pms/RestaurantManager';
+import TapeChart from './pms/TapeChart';
+
+
+const BookingEngineWidget = () => {
+    const userStr = localStorage.getItem('user');
+    const companyId = userStr ? JSON.parse(userStr).companyId : '';
+    const url = `${window.location.origin}/booking/${companyId}`;
+    return (
+        <div style={{ padding: '24px', background: 'white', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+            <h2 style={{marginTop:0}}>Motor de Reservas Públicas</h2>
+            <p style={{ color: '#475569', marginBottom: '16px' }}>Comparte este enlace con tus clientes para que reserven directamente:</p>
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '24px' }}>
+                <input type="text" readOnly value={url} style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#f8fafc', fontSize: '14px' }} />
+                <button style={{padding: '10px 16px', background: '#2563eb', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold'}} onClick={() => { navigator.clipboard.writeText(url); Swal.fire('Copiado', 'Enlace copiado al portapapeles', 'success'); }}>Copiar</button>
+                <a href={url} target="_blank" rel="noreferrer" style={{ padding: '10px 16px', background: '#f1f5f9', color: '#1e293b', border: '1px solid #cbd5e1', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', textDecoration: 'none' }}>Abrir URL</a>
+            </div>
+            <div style={{ padding: '16px', background: '#f0fdf4', borderRadius: '8px', color: '#166534', fontSize: '14px' }}>
+                <strong>💡 Tip:</strong> Puedes añadir este enlace en tu Instagram, Facebook o enviarlo por WhatsApp.
+            </div>
+        </div>
+    );
+};
 
 const STATUS_CONFIG = {
     AVAILABLE: { label: 'Disponible', color: '#10b981', bg: '#d1fae5' },
@@ -198,7 +220,11 @@ const PMSView = () => {
         } catch (e) { console.error(e); }
     };
 
-    useEffect(() => { fetchDashboard(); }, []);
+    useEffect(() => { 
+        if (activeTab === 'dashboard') {
+            fetchDashboard(); 
+        }
+    }, [activeTab]);
 
     const handleStatusChange = async (roomId, status) => {
         try {
@@ -219,12 +245,12 @@ const PMSView = () => {
         if (res.isConfirmed) {
             try {
                 const guests = dashboard.guestsPerRoom?.[roomId] || [];
-                if (guests[0]?.reservationNumber) {
-                    await api.post(`/pms/reservations/${guests[0].reservationNumber}/check-out`);
+                if (guests[0]?.reservationId) {
+                    await api.patch(`/pms/reservations/${guests[0].reservationId}/check-out`);
                     fetchDashboard();
                     Swal.fire('Éxito', 'Check-out realizado', 'success');
                 }
-            } catch (e) { Swal.fire('Error', 'No se pudo realizar check-out', 'error'); }
+            } catch (e) { Swal.fire('Error', e.response?.data?.message || 'No se pudo realizar check-out', 'error'); }
         }
     };
 
@@ -239,12 +265,12 @@ const PMSView = () => {
         if (days) {
             try {
                 const guests = dashboard.guestsPerRoom?.[roomId] || [];
-                if (guests[0]?.reservationNumber) {
-                    await api.patch(`/pms/reservations/${guests[0].reservationNumber}/extend`, { additionalDays: Number(days) });
+                if (guests[0]?.reservationId) {
+                    await api.patch(`/pms/reservations/${guests[0].reservationId}/extend`, { additionalDays: Number(days) });
                     fetchDashboard();
                     Swal.fire('Éxito', `Estadía extendida ${days} días`, 'success');
                 }
-            } catch (e) { Swal.fire('Error', 'No se pudo extender', 'error'); }
+            } catch (e) { Swal.fire('Error', e.response?.data?.message || 'No se pudo extender', 'error'); }
         }
     };
 
@@ -262,11 +288,11 @@ const PMSView = () => {
         if (formValues?.description && formValues?.amount) {
             try {
                 const guests = dashboard.guestsPerRoom?.[roomId] || [];
-                if (guests[0]?.reservationNumber) {
-                    await api.post(`/pms/reservations/${guests[0].reservationNumber}/add-charge`, { description: formValues.description, amount: Number(formValues.amount) });
+                if (guests[0]?.reservationId) {
+                    await api.post(`/pms/reservations/${guests[0].reservationId}/add-charge`, { description: formValues.description, amount: Number(formValues.amount) });
                     Swal.fire('Éxito', 'Cargo agregado', 'success');
                 }
-            } catch (e) { Swal.fire('Error', 'No se pudo agregar cargo', 'error'); }
+            } catch (e) { Swal.fire('Error', e.response?.data?.message || 'No se pudo agregar cargo', 'error'); }
         }
     };
 
@@ -286,12 +312,12 @@ const PMSView = () => {
         if (newRoomId) {
             try {
                 const guests = dashboard.guestsPerRoom?.[roomId] || [];
-                if (guests[0]?.reservationNumber) {
-                    await api.patch(`/pms/reservations/${guests[0].reservationNumber}/transfer`, { newRoomId });
+                if (guests[0]?.reservationId) {
+                    await api.patch(`/pms/reservations/${guests[0].reservationId}/transfer`, { newRoomId });
                     fetchDashboard();
                     Swal.fire('Éxito', 'Huésped transferido', 'success');
                 }
-            } catch (e) { Swal.fire('Error', 'No se pudo transferir', 'error'); }
+            } catch (e) { Swal.fire('Error', e.response?.data?.message || 'No se pudo transferir', 'error'); }
         }
     };
 
@@ -315,14 +341,14 @@ const PMSView = () => {
 
     const handleGenerateInvoice = async (roomId) => {
         const guests = dashboard.guestsPerRoom?.[roomId] || [];
-        if (!guests[0]?.reservationNumber) {
+        if (!guests[0]?.reservationId) {
             Swal.fire('Error', 'No hay reserva para generar factura');
             return;
         }
         try {
-            const res = await api.post(`/pms/invoices/from-reservation/${guests[0].reservationNumber}`);
+            const res = await api.post(`/pms/invoices/from-reservation/${guests[0].reservationId}`);
             Swal.fire('Éxito', `Factura ${res.data.invoiceNumber || 'generada'}`, 'success');
-        } catch (e) { Swal.fire('Error', 'No se pudo generar factura', 'error'); }
+        } catch (e) { Swal.fire('Error', e.response?.data?.message || 'No se pudo generar factura', 'error'); }
     };
 
     const handlePreAuthorize = async (roomId) => {
@@ -351,10 +377,12 @@ const PMSView = () => {
         { id: 'guests', label: 'Huéspedes', icon: <Users size={18} /> },
         { id: 'reservations', label: 'Reservas', icon: <Calendar size={18} /> },
         { id: 'calendar', label: 'Calendario', icon: <Calendar size={18} /> },
+        { id: 'tapeChart', label: 'Tablero (Cinta)', icon: <span>📊</span> },
         { id: 'housekeeping', label: 'Limpieza', icon: <span>🧹</span> },
         { id: 'maintenance', label: 'Mantenimiento', icon: <span>🔧</span> },
         { id: 'restaurant', label: 'Restaurante', icon: <span>🍽️</span> },
         { id: 'cashDrawer', label: 'Caja', icon: <Wallet size={18} /> },
+        { id: 'bookingEngine', label: 'Motor Reservas', icon: <span>🔗</span> },
         { id: 'rates', label: 'Tarifas', icon: <span>$</span> },
         { id: 'reports', label: 'Reportes', icon: <BarChart2 size={18} /> },
     ];
@@ -550,9 +578,11 @@ const PMSView = () => {
             case 'guests': return <GuestManager />;
             case 'reservations': return <ReservationManager />;
             case 'calendar': return <ReservationCalendar />;
+            case 'tapeChart': return <TapeChart />;
             case 'housekeeping': return <HousekeepingManager />;
             case 'maintenance': return <MaintenanceManager />;
             case 'restaurant': return <RestaurantManager />;
+            case 'bookingEngine': return <BookingEngineWidget />;
             case 'rates': return <RateManager />;
             case 'reports': return <ReportManager />;
             default: return <div>Selecciona una opción</div>;

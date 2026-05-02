@@ -77,4 +77,13 @@ export class CleaningRequest extends BaseAuditEntity {
 
     @Column({ type: 'timestamp', nullable: true })
     verifiedAt: Date;
+
+    @Column({ type: 'timestamp', nullable: true })
+    startedAt: Date;
+
+    @Column({ type: 'jsonb', nullable: true })
+    checklist: any;
+
+    @Column({ type: 'jsonb', nullable: true })
+    minibarConsumptions: any;
 }

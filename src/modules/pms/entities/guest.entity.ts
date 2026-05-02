@@ -20,7 +20,7 @@ export class Guest extends BaseAuditEntity {
     @Column({ type: 'enum', enum: GuestDocType, default: GuestDocType.CC })
     docType: GuestDocType;
 
-    @Column({ unique: false })
+    @Column({ unique: false, nullable: true, default: '' })
     docNumber: string;
 
     @Column({ nullable: true })
@@ -37,6 +37,9 @@ export class Guest extends BaseAuditEntity {
 
     @Column({ nullable: true })
     notes: string;
+
+    @Column({ nullable: true, default: 'DIRECT' })
+    source: string;
 
     @ManyToOne(() => Company)
     company: Company;

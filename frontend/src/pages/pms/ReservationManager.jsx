@@ -12,7 +12,7 @@ const STATUS_COLORS = {
     NO_SHOW:     { bg:'#fce7f3', color:'#9d174d', label:'No Show' },
 };
 
-const ReservationManager = () => {
+const ReservationManager = ({ onRefresh }) => {
     const [reservations, setReservations] = useState([]);
     const [rooms, setRooms] = useState([]);
     const [guests, setGuests] = useState([]);
@@ -65,6 +65,7 @@ const ReservationManager = () => {
             setShowForm(false);
             setForm({ adults:1, children:0, source:'DIRECT', ratePerNight:'', checkIn:'', checkOut:'', roomId:'', guestId:'', autoConfirm:false });
             fetchAll();
+            if (onRefresh) onRefresh();
             Swal.fire('Reserva creada', '', 'success');
         } catch (e) { Swal.fire('Error', e.response?.data?.message || 'Error al guardar', 'error'); }
     };
@@ -73,24 +74,36 @@ const ReservationManager = () => {
         const labels = { 'check-in':'Hacer Check-In', 'check-out':'Hacer Check-Out', 'cancel':'Cancelar reserva', 'confirm':'Confirmar reserva' };
         
         if (type === 'check-out') {
-            const { isConfirmed, value } = await Swal.fire({ 
-                title: 'Check-Out', 
-                text: '¿Aplicar cargo por late check-out?',
-                icon:'question', 
-                showCancelButton:true,
-                confirmButtonText: 'Con cargo',
-                cancelButtonText: 'Sin cargo',
-            });
-            if (!isConfirmed && !value) return;
             try {
-                await api.patch(`/pms/reservations/${id}/${type}`, { applyLateFee: isConfirmed });
-                fetchAll();
-            } catch (e) { 
-                if (e.response?.data?.requiresConfirmation) {
-                    Swal.fire('Info', e.response.data.message, 'info');
-                } else {
-                    Swal.fire('Error', e.response?.data?.message || 'No se pudo completar la acción', 'error'); 
+                const response = await api.patch(`/pms/reservations/${id}/${type}`, {});
+                
+                if (response.data?.requiresConfirmation) {
+                    const resLate = await Swal.fire({ 
+                        title: 'Salida Tardía', 
+                        text: response.data.message,
+                        icon: 'warning', 
+                        showCancelButton: true,
+                        showDenyButton: true,
+                        confirmButtonText: 'Aplicar Cargo',
+                        denyButtonText: 'Sin Cargo',
+                        cancelButtonText: 'Cancelar'
+                    });
+                    
+                    if (resLate.isConfirmed) {
+                        await api.patch(`/pms/reservations/${id}/${type}`, { applyLateFee: true });
+                    } else if (resLate.isDenied) {
+                        await api.patch(`/pms/reservations/${id}/${type}`, { forceLateCheckout: true });
+                    } else {
+                        return; // Operación cancelada
+                    }
                 }
+                
+                fetchAll();
+                if (onRefresh) onRefresh();
+                Swal.fire('Éxito', 'Check-out realizado', 'success');
+            } catch (e) { 
+                console.error(e);
+                Swal.fire('Error', e.response?.data?.message || 'No se pudo completar la acción', 'error'); 
             }
             return;
         }
@@ -100,6 +113,7 @@ const ReservationManager = () => {
         try {
             await api.patch(`/pms/reservations/${id}/${type}`);
             fetchAll();
+            if (onRefresh) onRefresh();
         } catch (e) { Swal.fire('Error', e.response?.data?.message || 'No se pudo completar la acción', 'error'); }
     };
 
@@ -170,7 +184,7 @@ const ReservationManager = () => {
                     </div>
                     {form.checkIn && form.checkOut && form.ratePerNight && (
                         <div style={s.preview}>
-                            {nights(form.checkIn, form.checkOut)} noches × $ {Number(form.ratePerNight).toLocaleString()} = <strong style={{color:'var(--primary)'}}>$ {(nights(form.checkIn,form.checkOut)*Number(form.ratePerNight)).toLocaleString()}</strong>
+                            {nights(form.checkIn, form.checkOut)} noches Ã— $ {Number(form.ratePerNight).toLocaleString()} = <strong style={{color:'var(--primary)'}}>$ {(nights(form.checkIn,form.checkOut)*Number(form.ratePerNight)).toLocaleString()}</strong>
                         </div>
                     )}
                     <div style={s.fa}>

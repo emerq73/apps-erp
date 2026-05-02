@@ -20,6 +20,12 @@ export class RoomType extends BaseAuditEntity {
     @ManyToOne(() => Company)
     company: Company;
 
+    @Column({ type: 'simple-array', nullable: true })
+    images: string[];
+
+    @Column({ type: 'simple-array', nullable: true })
+    amenities: string[];
+
     @OneToMany(() => Room, room => room.roomType)
     rooms: Room[];
 }

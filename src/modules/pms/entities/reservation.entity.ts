@@ -18,8 +18,9 @@ export enum ReservationSource {
     DIRECT = 'DIRECT',
     PHONE = 'PHONE',
     WALK_IN = 'WALK_IN',
-    OTA = 'OTA',        // Booking.com, Expedia, etc.
+    OTA = 'OTA',
     CORPORATE = 'CORPORATE',
+    BOOKING_ENGINE = 'BOOKING_ENGINE',
 }
 
 @Entity('reservations')
